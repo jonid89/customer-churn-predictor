@@ -20,9 +20,9 @@ def prepare_churn_data(csv_path, target_column='Churn'):
     if 'TotalCharges' in df.columns:
         df['TotalCharges'] = pd.to_numeric(df['TotalCharges'], errors='coerce')
 
-    # Separate features (X) and target (y)
+    # Separate features (X) and target (y), mapping target to 1 and 0 for XGBoost
     X = df.drop(columns=[target_column])
-    y = df[target_column]
+    y = df[target_column].map({'Yes': 1, 'No': 0})
     
     # 2. Identify numeric and categorical columns dynamically
     numeric_features = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
