@@ -1,5 +1,5 @@
 import joblib
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.metrics import accuracy_score, classification_report
 from data_prep import prepare_churn_data
 
@@ -8,8 +8,8 @@ def train_and_save_model(csv_path, model_path='model.joblib', preprocessor_path=
     # We assume 'Churn' is the target column. Update if your CSV uses a different name.
     X_train, X_test, y_train, y_test, preprocessor = prepare_churn_data(csv_path)
 
-    print("\n2. Training Random Forest model...")
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    print("\n2. Training HistGradientBoosting model...")
+    model = HistGradientBoostingClassifier(class_weight='balanced', max_iter=100, random_state=42)
     model.fit(X_train, y_train)
 
     print("\n3. Evaluating model...")
@@ -26,4 +26,4 @@ def train_and_save_model(csv_path, model_path='model.joblib', preprocessor_path=
 
 if __name__ == "__main__":
     # Run the training script using the Telco Customer Churn database
-    train_and_save_model('../data/WA_Fn-UseC_-Telco-Customer-Churn.csv')
+    train_and_save_model('./data/WA_Fn-UseC_-Telco-Customer-Churn.csv')
