@@ -6,6 +6,7 @@ from sklearn.metrics import accuracy_score, classification_report
 from data_prep import prepare_churn_data
 
 def train_and_save_model(csv_path, model_path='model.joblib', preprocessor_path='preprocessor.joblib'):
+    script_start_time = time.time()
     print("1. Preparing data...")
     # We assume 'Churn' is the target column. Update if your CSV uses a different name.
     X_train, X_test, y_train, y_test, preprocessor = prepare_churn_data(csv_path)
@@ -44,6 +45,8 @@ def train_and_save_model(csv_path, model_path='model.joblib', preprocessor_path=
     joblib.dump(model, model_path)
     joblib.dump(preprocessor, preprocessor_path)
     print(f"Done! Saved to {model_path} and {preprocessor_path}")
+    script_end_time = time.time()
+    print(f"\nTotal script execution time: {script_end_time - script_start_time:.2f} seconds.")
 
 if __name__ == "__main__":
     # Run the training script using the Telco Customer Churn database
