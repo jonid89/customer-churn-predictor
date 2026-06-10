@@ -8,6 +8,25 @@ import random
 
 # 1. Set up the page
 st.set_page_config(page_title="Customer Churn Predictor", layout="wide")
+
+# Inject custom CSS to force scrollbars to always be visible (bypassing OS defaults)
+st.markdown("""
+    <style>
+    *::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+        display: block !important;
+    }
+    *::-webkit-scrollbar-thumb {
+        background-color: rgba(0,0,0,0.4) !important;
+        border-radius: 5px;
+    }
+    *::-webkit-scrollbar-track {
+        background: rgba(0,0,0,0.1);
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 st.title("Customer Churn Predictor 🔮")
 st.write("Analyze customer profiles using our XGBoost model to predict churn risk, understand key risk factors, and generate AI-driven retention emails.")
 
@@ -52,11 +71,13 @@ df_importances = df_importances.sort_values(by='Importance (%)', ascending=False
 tab1, tab2 = st.tabs(["🎯 Action Center", "📊 Dashboard & Model"])
 
 with tab1:
-    st.write("### 1. Customer Profile")
     
     # Initialize session state for randomizer
     if 'rand_trigger' not in st.session_state:
         st.session_state['rand_trigger'] = False
+
+    high_threshold = 70
+    medium_threshold = 50
 
     def randomize_inputs():
         st.session_state['contract'] = random.choice(df['Contract'].dropna().unique())
@@ -75,23 +96,32 @@ with tab1:
         if key not in st.session_state:
             st.session_state[key] = default
 
-    st.button("🎲 Randomize Customer", on_click=randomize_inputs)
-
     input_col, result_col = st.columns([1, 1], gap="large")
 
     with input_col:
-        st.write("#### Manual Inputs")
-        contract = st.selectbox("Contract Type", df['Contract'].dropna().unique(), key='contract')
-        internet = st.selectbox("Internet Service", df['InternetService'].dropna().unique(), key='internet')
-        security = st.selectbox("Online Security", df['OnlineSecurity'].dropna().unique(), key='security')
-        support = st.selectbox("Tech Support", df['TechSupport'].dropna().unique(), key='support')
-        movies = st.selectbox("Streaming Movies", df['StreamingMovies'].dropna().unique(), key='movies')
-        payment = st.selectbox("Payment Method", df['PaymentMethod'].dropna().unique(), key='payment')
-        tenure = st.slider("Tenure (Months)", 0, 72, key='tenure')
-        monthly = st.number_input("Monthly Charges ($)", 0.0, 200.0, key='monthly')
+        header_col, btn_col = st.columns([0.4, 0.6])
+        with header_col:
+            st.write("#### Manual Inputs")
+        with btn_col:
+            st.button("🎲 Randomize Customer", on_click=randomize_inputs, use_container_width=True)
+            
+        # Helper function for side-by-side form inputs
+        def input_row(label, widget_type, *args, **kwargs):
+            c1, c2 = st.columns([0.4, 0.6])
+            c1.markdown(f"<div style='margin-top: 5px;'>{label}</div>", unsafe_allow_html=True)
+            kwargs['label_visibility'] = "collapsed"
+            return getattr(c2, widget_type)(label, *args, **kwargs)
+
+        contract = input_row("Contract Type", "selectbox", df['Contract'].dropna().unique(), key='contract')
+        internet = input_row("Internet Service", "selectbox", df['InternetService'].dropna().unique(), key='internet')
+        security = input_row("Online Security", "selectbox", df['OnlineSecurity'].dropna().unique(), key='security')
+        support = input_row("Tech Support", "selectbox", df['TechSupport'].dropna().unique(), key='support')
+        movies = input_row("Streaming Movies", "selectbox", df['StreamingMovies'].dropna().unique(), key='movies')
+        payment = input_row("Payment Method", "selectbox", df['PaymentMethod'].dropna().unique(), key='payment')
+        tenure = input_row("Tenure (Months)", "slider", 0, 72, key='tenure')
+        monthly = input_row("Monthly Charges ($)", "number_input", 0.0, 200.0, key='monthly')
 
     with result_col:
-        st.write("#### 2. Risk Analysis")
         
         # Construct full dictionary for pipeline
         input_dict = {
@@ -113,22 +143,23 @@ with tab1:
         top_indices = np.argsort(contributions)[::-1][:3]
         top_reasons = [all_feature_names[i] for i in top_indices if contributions[i] > 0]
 
-        if prob > 70:
-            st.metric(label="Predicted Churn Risk", value=f"{prob:.1f}%", delta="High Risk", delta_color="inverse")
-        elif prob > 40:
-            st.metric(label="Predicted Churn Risk", value=f"{prob:.1f}%", delta="Medium Risk", delta_color="off")
+        st.write("##### Predicted Churn Risk:")
+        if prob > high_threshold:
+            st.metric(label="High Risk", value=f"{prob:.1f}%", delta="High Risk", delta_color="inverse", label_visibility="collapsed")
+        elif prob > medium_threshold:
+            st.metric(label="Medium Risk", value=f"{prob:.1f}%", delta="Medium Risk", delta_color="off", label_visibility="collapsed")
         else:
-            st.metric(label="Predicted Churn Risk", value=f"{prob:.1f}%", delta="Low Risk", delta_color="normal")
+            st.metric(label="Low Risk", value=f"{prob:.1f}%", delta="Low Risk", delta_color="normal", label_visibility="collapsed")
 
-        st.write("##### Top Risk Factors:")
-        if prob > 40 and len(top_reasons) > 0:
+        st.write("###### Top Risk Factors:")
+        if prob > medium_threshold and len(top_reasons) > 0:
             for reason in top_reasons:
                 st.write(f"- {reason.replace('_', ': ')}")
-        elif prob <= 40:
+        elif prob <= medium_threshold:
             st.success("Customer profile looks stable.")
 
     st.write("---")
-    st.write("### 3. Action Center")
+    st.write("### Action Center")
     if prob > 70:
         st.warning("⚠️ High Churn Risk Detected. Immediate retention action recommended.")
         if st.button("✉️ Generate Retention Email with Claude", type="primary"):
@@ -152,7 +183,7 @@ with tab2:
     st.write("### Top Impactful Features")
     chart = alt.Chart(df_importances.head(10)).mark_bar().encode(
         x=alt.X('Importance (%):Q', title='Importance (%)'),
-        y=alt.Y('Feature:N', sort='-x', title='Feature'),
+        y=alt.Y('Feature:N', sort='-x', title='Feature', axis=alt.Axis(labelLimit=0, labelFontSize=13, titleFontSize=14)),
         color=alt.Color('Importance (%):Q', scale=alt.Scale(scheme='blues'), legend=None),
         tooltip=['Feature', 'Importance (%)']
     ).interactive()
