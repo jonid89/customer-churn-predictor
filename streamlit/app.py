@@ -14,8 +14,12 @@ st.write("Analyze customer profiles using our XGBoost model to predict churn ris
 # 2. Load the model and preprocessor
 @st.cache_resource
 def load_components():
-    model = joblib.load('model.joblib')
-    preprocessor = joblib.load('preprocessor.joblib')
+    # Dynamically resolve absolute paths so it works from anywhere
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    model_path = os.path.join(base_dir, 'models', 'model.joblib')
+    preprocessor_path = os.path.join(base_dir, 'models', 'preprocessor.joblib')
+    model = joblib.load(model_path)
+    preprocessor = joblib.load(preprocessor_path)
     return model, preprocessor
 
 try:
@@ -27,10 +31,8 @@ except Exception as e:
 # 3. Load the Database
 @st.cache_data
 def load_data():
-    # Dynamically find the data file whether running from root or src
-    file_path = 'data/WA_Fn-UseC_-Telco-Customer-Churn.csv'
-    if not os.path.exists(file_path):
-        file_path = '../data/WA_Fn-UseC_-Telco-Customer-Churn.csv'
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    file_path = os.path.join(base_dir, 'data', 'WA_Fn-UseC_-Telco-Customer-Churn.csv')
     return pd.read_csv(file_path)
 
 try:

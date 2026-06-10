@@ -1,11 +1,20 @@
 import joblib
 import time
+import os
 from xgboost import XGBClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import accuracy_score, classification_report
 from data_prep import prepare_churn_data
 
-def train_and_save_model(csv_path, model_path='model.joblib', preprocessor_path='preprocessor.joblib'):
+def train_and_save_model(csv_path, model_path=None, preprocessor_path=None):
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if model_path is None:
+        model_path = os.path.join(base_dir, 'models', 'model.joblib')
+    if preprocessor_path is None:
+        preprocessor_path = os.path.join(base_dir, 'models', 'preprocessor.joblib')
+        
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)
+
     script_start_time = time.time()
     print("1. Preparing data...")
     # We assume 'Churn' is the target column. Update if your CSV uses a different name.
@@ -49,5 +58,7 @@ def train_and_save_model(csv_path, model_path='model.joblib', preprocessor_path=
     print(f"\nTotal script execution time: {script_end_time - script_start_time:.2f} seconds.")
 
 if __name__ == "__main__":
-    # Run the training script using the Telco Customer Churn database
-    train_and_save_model('./data/WA_Fn-UseC_-Telco-Customer-Churn.csv')
+    # Dynamically resolve the path to the dataset
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    csv_file_path = os.path.join(base_dir, 'data', 'WA_Fn-UseC_-Telco-Customer-Churn.csv')
+    train_and_save_model(csv_file_path)
