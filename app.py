@@ -9,24 +9,6 @@ import random
 # 1. Set up the page
 st.set_page_config(page_title="Customer Churn Predictor", layout="wide")
 
-# Inject custom CSS to force scrollbars to always be visible (bypassing OS defaults)
-st.markdown("""
-    <style>
-    *::-webkit-scrollbar {
-        width: 10px;
-        height: 10px;
-        display: block !important;
-    }
-    *::-webkit-scrollbar-thumb {
-        background-color: rgba(0,0,0,0.4) !important;
-        border-radius: 5px;
-    }
-    *::-webkit-scrollbar-track {
-        background: rgba(0,0,0,0.1);
-    }
-    </style>
-""", unsafe_allow_html=True)
-
 st.title("Customer Churn Predictor 🔮")
 st.write("Analyze customer profiles using our XGBoost model to predict churn risk, understand key risk factors, and generate AI-driven retention emails.")
 
@@ -96,10 +78,10 @@ with tab1:
         if key not in st.session_state:
             st.session_state[key] = default
 
-    input_col, result_col = st.columns([1, 1], gap="large")
+    input_col, result_col = st.columns([0.6, 0.4], gap="xlarge")
 
     with input_col:
-        header_col, btn_col = st.columns([0.4, 0.6])
+        header_col, btn_col = st.columns([0.6, 0.4])
         with header_col:
             st.write("#### Manual Inputs")
         with btn_col:
@@ -143,7 +125,7 @@ with tab1:
         top_indices = np.argsort(contributions)[::-1][:3]
         top_reasons = [all_feature_names[i] for i in top_indices if contributions[i] > 0]
 
-        st.write("##### Predicted Churn Risk:")
+        st.write("#### Predicted Churn Risk:")
         if prob > high_threshold:
             st.metric(label="High Risk", value=f"{prob:.1f}%", delta="High Risk", delta_color="inverse", label_visibility="collapsed")
         elif prob > medium_threshold:
@@ -183,7 +165,7 @@ with tab2:
     st.write("### Top Impactful Features")
     chart = alt.Chart(df_importances.head(10)).mark_bar().encode(
         x=alt.X('Importance (%):Q', title='Importance (%)'),
-        y=alt.Y('Feature:N', sort='-x', title='Feature', axis=alt.Axis(labelLimit=0, labelFontSize=13, titleFontSize=14)),
+        y=alt.Y('Feature:N', sort='-x', title='Feature', axis=alt.Axis(labelLimit=0, labelFontSize=12, titleFontSize=14)),
         color=alt.Color('Importance (%):Q', scale=alt.Scale(scheme='blues'), legend=None),
         tooltip=['Feature', 'Importance (%)']
     ).interactive()
