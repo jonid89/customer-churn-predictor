@@ -2,6 +2,27 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import random
+import os
+from anthropic import Anthropic
+
+def get_sanitized_api_key():
+    """Fetch API key from Streamlit secrets or environment and sanitize it."""
+    # Streamlit secrets usually take precedence in production
+    key = None
+    try:
+        key = st.secrets.get("ANTHROPIC_API_KEY")
+    except Exception:
+        pass
+    
+    # Fallback to .env for local development
+    if not key:
+        key = os.getenv("ANTHROPIC_API_KEY")
+        
+    if not key:
+        raise ValueError("ANTHROPIC_API_KEY is missing. Please set it in .env or Streamlit Secrets.")
+    
+    # Remove whitespace, quotes, and hidden carriage returns
+    return str(key).strip().replace('"', '').replace("'", "").replace('\r', '')
 
 def render(df, model, preprocessor, importances, all_feature_names):
     # Initialize session state for randomizer
@@ -95,7 +116,56 @@ def render(df, model, preprocessor, importances, all_feature_names):
     if prob > 70:
         st.warning("⚠️ High Churn Risk Detected. Immediate retention action recommended.")
         if st.button("✉️ Generate Retention Email with Claude", type="primary"):
-            with st.spinner("Drafting personalized email..."):
-                st.info(f"Subject: Let's upgrade your experience!\n\nHi there,\n\nWe noticed you've been with us for {tenure} months on a {contract} plan. We value your business and would love to offer you a complimentary upgrade to our premium support.\n\n*[Anthropic API Integration coming next!]*")
+            with st.spinner("Drafting personalized email using Claude..."):
+                # Fetch API key securely
+                api_key = None
+                try:
+                    api_key = st.secrets.get("ANTHROPIC_API_KEY")
+                except Exception:
+                    pass
+                
+                # Fallback to .env for local development
+                if not api_key:
+                    api_key = os.getenv("ANTHROPIC_API_KEY")
+
+                if not api_key:
+                    st.error("Anthropic API key is not set! Please add ANTHROPIC_API_KEY to your `.streamlit/secrets.toml` file.")
+                else:
+                    try:
+                        client = Anthropic(api_key=api_key)
+                        top_reasons_str = ', '.join([r.replace('_', ': ') for r in top_reasons])
+                        
+                        prompt = f"""
+                        You are an expert customer retention specialist for a telecommunications company.
+                        Write a highly personalized retention email to a customer who is at high risk of churning.
+                        
+                        Customer Profile:
+                        - Tenure: {tenure} months
+                        - Contract Type: {contract}
+                        - Monthly Charges: ${monthly:.2f}
+                        - Main reasons for churn risk: {top_reasons_str}
+                        
+                        Instructions:
+                        1. Write an engaging subject line.
+                        2. Be warm and empathetic.
+                        3. Address their specific profile subtly (e.g., if they are month-to-month, offer an incentive to switch to a 1-year plan).
+                        4. Offer a compelling retention incentive (discount, free upgrade, etc.).
+                        5. Keep the email concise and professional. Sign off as "The Retention Team".
+                        """
+                        
+                        response = client.messages.create(
+                            model="claude-haiku-4-5-20251001",
+                            max_tokens=400,
+                            temperature=0.7,
+                            system="You are a world-class telecom retention expert.",
+                            messages=[
+                                {"role": "user", "content": prompt}
+                            ]
+                        )
+                        
+                        st.info(response.content[0].text)
+                        
+                    except Exception as e:
+                        st.error(f"Error generating email from Anthropic: {e}")
     else:
         st.success("✅ Customer is at a safe retention level. No proactive retention email required.")
