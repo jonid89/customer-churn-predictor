@@ -1,0 +1,9 @@
+[theme]
+# Base the theme on dark mode to ensure built-in elements adapt properly
+base = "dark"
+
+# A professional "Slate Dark" color palette
+primaryColor = "#3B82F6"            # Buttons and accents
+backgroundColor = "#0F172A"         # Main background
+secondaryBackgroundColor = "#1E293B" # Sidebars and input fields
+textColor = "#F8FAFC"               # Text
