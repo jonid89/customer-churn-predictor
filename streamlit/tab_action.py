@@ -112,7 +112,7 @@ def render(df, model, preprocessor, importances, all_feature_names):
             st.success("Customer profile looks stable.")
 
     st.write("---")
-    st.write("### Action Center")
+    st.write("### 🤖 AI Action")
     if prob > high_threshold:
         st.warning("⚠️ High Churn Risk Detected. Immediate retention action recommended.")
         if st.button("✉️ Generate Retention Email with Claude"):
