@@ -49,7 +49,7 @@ def render(df, model, preprocessor, importances, all_feature_names):
         if key not in st.session_state:
             st.session_state[key] = default
 
-    input_col, result_col = st.columns([0.6, 0.4], gap="xlarge")
+    input_col, result_col = st.columns([0.55, 0.45], gap="xxlarge")
 
     with input_col:
         header_col, btn_col = st.columns([0.6, 0.4])
@@ -113,9 +113,9 @@ def render(df, model, preprocessor, importances, all_feature_names):
 
     st.write("---")
     st.write("### Action Center")
-    if prob > 70:
+    if prob > high_threshold:
         st.warning("⚠️ High Churn Risk Detected. Immediate retention action recommended.")
-        if st.button("✉️ Generate Retention Email with Claude", type="primary"):
+        if st.button("✉️ Generate Retention Email with Claude"):
             with st.spinner("Drafting personalized email using Claude..."):
                 # Fetch API key securely
                 api_key = None

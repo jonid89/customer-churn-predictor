@@ -2,6 +2,9 @@ import streamlit as st
 import altair as alt
 
 def render(df, df_importances):
+    st.write("This dashboard provides an overview of the Telco Customer dataset alongside the performance metrics of our hyperparameter-tuned XGBoost model. Explore the baseline data and see which features drive churn the most.")
+    st.write("---")
+
     st.write("### Telco Customer Database")
     st.dataframe(df.head(100), height=150)
 

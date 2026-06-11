@@ -9,7 +9,7 @@ import tab_dashboard
 st.set_page_config(page_title="Customer Churn Predictor", layout="wide")
 
 st.title("Customer Churn Predictor 🔮")
-st.write("Analyze customer profiles using our XGBoost model to predict churn risk, understand key risk factors, and generate AI-driven retention emails.")
+st.write("Enter customer details in the 🎯Action Center to evaluate churn risk and draft retention emails, or explore the model metrics in the 📊Dashboard & Model tab.")
 
 # 2. Load the model and preprocessor
 @st.cache_resource
@@ -51,7 +51,7 @@ df_importances = pd.DataFrame({'Feature': all_feature_names, 'Importance (%)': i
 df_importances = df_importances.sort_values(by='Importance (%)', ascending=False).reset_index(drop=True)
 
 # 4. Create UI Tabs
-tab1, tab2 = st.tabs(["🎯 Action Center", "📊 Dashboard & Model"])
+tab1, tab2 = st.tabs(["✉️ AI Action", "📊 Dashboard & Model"])
 
 with tab1:
     tab_action.render(df, model, preprocessor, importances, all_feature_names)
