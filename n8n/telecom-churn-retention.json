@@ -1,0 +1,497 @@
+{
+  "name": "Telecom Churn Retention",
+  "nodes": [
+    {
+      "parameters": {
+        "content": ["## Telecom churn retention\n\nSame path as the Streamlit Action Center.\n\n**Score with XGBoost** runs `src/batch_score.py`. That script loads `models/model.joblib` and `models/preprocessor.joblib`, drops `customerID` and `Churn`, coerces blank `TotalCharges`, and scores with `predict_proba` on the churn class. Top risk factors are the three largest positive contributions (`transformed value × feature importance`), with `_` rewritten as `: `.\n\n",
+          "**High Churn Risk?** follows `high_threshold = 70` in `streamlit/tab_action.py`. The true branch also requires `already_churned` to be false, so a historical `Churn = Yes` row does not get a retention draft. Everyone else lands on **Safe Retention Level**.\n\n**Draft Retention Email** calls Claude `claude-haiku-4-5-20251001` (`max_tokens` 400, `temperature` 0.7) with the Action Center system prompt and customer profile.\n\n### Before you run it\n",
+          "1. Use self-hosted n8n on this machine. The score step is an Execute Command against this repo. n8n Cloud cannot read these files.\n2. Create the model artifacts if `models/` is empty: `python src/train_model.py`\n3. In **Runtime Config**, set `project_dir`, `python_bin`, and `shell` (`windows` or `linux`).\n4. On **Draft Retention Email**, attach a Header Auth credential whose name is `x-api-key` and whose value is your `ANTHROPIC_API_KEY`.\n"],
+        "height": 460,
+        "width": 620,
+        "color": 4
+      },
+      "id": "c4a1e8b0-7d32-4f61-9a10-0b6e1c2d3001",
+      "name": "Pipeline Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "c4a1e8b0-7d32-4f61-9a10-0b6e1c2d3002",
+      "name": "Run Churn Pipeline",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        280,
+        540
+      ],
+      "notes": "Starts a batch run over the Telco customer CSV."
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d1a0b100-0001-4000-8000-000000000001",
+              "name": "project_dir",
+              "value": "c:\\Users\\jonid\\Documents\\GitHub\\customer-churn-predictor",
+              "type": "string"
+            },
+            {
+              "id": "d1a0b100-0001-4000-8000-000000000002",
+              "name": "python_bin",
+              "value": "python",
+              "type": "string"
+            },
+            {
+              "id": "d1a0b100-0001-4000-8000-000000000003",
+              "name": "shell",
+              "value": "windows",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c4a1e8b0-7d32-4f61-9a10-0b6e1c2d3003",
+      "name": "Runtime Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        540,
+        540
+      ],
+      "notes": "shell is windows or linux. python_bin can be venv\\Scripts\\python.exe."
+    },
+    {
+      "parameters": {
+        "command": ["={{ $json.shell === 'windows' ? 'cd /d \"' + $json.project_dir + '\" ",
+          "&& \"' + $json.python_bin + '\" src/batch_score.py' : 'cd \"' + ",
+          "$json.project_dir + '\" && \"' + $json.python_bin + '\" src/batch_score.py' }}"]
+      },
+      "id": "c4a1e8b0-7d32-4f61-9a10-0b6e1c2d3004",
+      "name": "Score with XGBoost",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        820,
+        540
+      ],
+      "executeOnce": true,
+      "notes": "Loads models/model.joblib and models/preprocessor.joblib, same as streamlit/app.py."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": ["const stdout = $input.first().json.stdout || '';\nconst start = stdout.indexOf('[');\nconst end = stdout.lastIndexOf(']');\nif (start === -1 || end < start) {\n",
+          "  const stderr = $input.first().json.stderr || stdout.slice(0, 500);\n  throw new Error('XGBoost scoring script did not return a JSON array. ' + stderr);\n}\nconst customers = JSON.parse(stdout.slice(start, end + 1));\n",
+          "if (!Array.isArray(customers)) {\n  throw new Error('Expected a JSON array of scored customers.');\n}\nreturn customers.map((customer) => ({ json: customer }));\n"]
+      },
+      "id": "c4a1e8b0-7d32-4f61-9a10-0b6e1c2d3005",
+      "name": "Parse Scored Customers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "type": "simple",
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "fieldName": "churn_probability",
+              "order": "descending"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c4a1e8b0-7d32-4f61-9a10-0b6e1c2d3006",
+      "name": "Sort by Risk",
+      "type": "n8n-nodes-base.sort",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e2b1c300-1111-4a11-8111-000000000001",
+              "leftValue": "={{ $json.churn_probability }}",
+              "rightValue": 70,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "e2b1c300-1111-4a11-8111-000000000002",
+              "leftValue": "={{ $json.already_churned }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c4a1e8b0-7d32-4f61-9a10-0b6e1c2d3007",
+      "name": "High Churn Risk?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1600,
+        540
+      ],
+      "notes": "True branch matches tab_action.py: probability > 70. Already-churned rows stay on the false branch."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": ["const customer = $input.item.json;\nconst monthlyNumber = Number(customer.monthly_charges);\nconst monthly = Number.isFinite(monthlyNumber) ? monthlyNumber.toFixed(2) : String(customer.monthly_charges);\nconst prompt = [\n  'You are an expert customer retention specialist for a telecommunications company.',\n",
+          "  'Write a highly personalized retention email to a customer who is at high risk of churning.',\n  '',\n  'Customer Profile:',\n  `- Tenure: ${customer.tenure} months`,\n  `- Contract Type: ${customer.contract}`,\n  `- Monthly Charges: $${monthly}`,\n  `- Main reasons for churn risk: ${customer.top_reasons_str}`,\n  '',\n  'Instructions:',\n  '1. Write an engaging subject line.',\n  '2. Be warm and empathetic.',\n",
+          "  '3. Address their specific profile subtly (e.g., if they are month-to-month, offer an incentive to switch to a 1-year plan).',\n  '4. Offer a compelling retention incentive (discount, free upgrade, etc.).',\n  '5. Keep the email concise and professional. Sign off as \"The Retention Team\".',\n].join('\\n');\n\nreturn { json: { ...customer, prompt } };\n"]
+      },
+      "id": "c4a1e8b0-7d32-4f61-9a10-0b6e1c2d3008",
+      "name": "Build Retention Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1880,
+        380
+      ],
+      "notes": "Same profile fields and instructions as the Claude prompt in streamlit/tab_action.py."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": ["={\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 400,\n  \"temperature\": 0.7,\n",
+          "  \"system\": \"You are a world-class telecom retention expert.\",\n  \"messages\": [\n    {\n",
+          "      \"role\": \"user\",\n      \"content\": {{ JSON.stringify($json.prompt) }}\n    }\n  ]\n}"],
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 5,
+              "batchInterval": 1000
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "id": "c4a1e8b0-7d32-4f61-9a10-0b6e1c2d3009",
+      "name": "Draft Retention Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        380
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "notes": "Header Auth credential: Name x-api-key, Value = ANTHROPIC_API_KEY. Sends one Messages API call per high-risk customer.",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "anthropicHeaderAuth",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f3c2d400-0001-4000-8000-000000000001",
+              "name": "customerID",
+              "value": "={{ $('Build Retention Prompt').item.json.customerID }}",
+              "type": "string"
+            },
+            {
+              "id": "f3c2d400-0001-4000-8000-000000000002",
+              "name": "tenure",
+              "value": "={{ $('Build Retention Prompt').item.json.tenure }}",
+              "type": "number"
+            },
+            {
+              "id": "f3c2d400-0001-4000-8000-000000000003",
+              "name": "contract",
+              "value": "={{ $('Build Retention Prompt').item.json.contract }}",
+              "type": "string"
+            },
+            {
+              "id": "f3c2d400-0001-4000-8000-000000000004",
+              "name": "monthly_charges",
+              "value": "={{ $('Build Retention Prompt').item.json.monthly_charges }}",
+              "type": "number"
+            },
+            {
+              "id": "f3c2d400-0001-4000-8000-000000000005",
+              "name": "churn_probability",
+              "value": "={{ $('Build Retention Prompt').item.json.churn_probability }}",
+              "type": "number"
+            },
+            {
+              "id": "f3c2d400-0001-4000-8000-000000000006",
+              "name": "risk_band",
+              "value": "={{ $('Build Retention Prompt').item.json.risk_band }}",
+              "type": "string"
+            },
+            {
+              "id": "f3c2d400-0001-4000-8000-000000000007",
+              "name": "top_reasons_str",
+              "value": "={{ $('Build Retention Prompt').item.json.top_reasons_str }}",
+              "type": "string"
+            },
+            {
+              "id": "f3c2d400-0001-4000-8000-000000000008",
+              "name": "action",
+              "value": "High Churn Risk Detected. Immediate retention action recommended.",
+              "type": "string"
+            },
+            {
+              "id": "f3c2d400-0001-4000-8000-000000000009",
+              "name": "retention_email",
+              "value": "={{ $json.content[0].text }}",
+              "type": "string"
+            },
+            {
+              "id": "f3c2d400-0001-4000-8000-000000000010",
+              "name": "model",
+              "value": "claude-haiku-4-5-20251001",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c4a1e8b0-7d32-4f61-9a10-0b6e1c2d300a",
+      "name": "Format Email Draft",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2440,
+        380
+      ],
+      "notes": "retention_email is response.content[0].text, the same field the Streamlit app displays."
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a4d3e500-0001-4000-8000-000000000001",
+              "name": "customerID",
+              "value": "={{ $json.customerID }}",
+              "type": "string"
+            },
+            {
+              "id": "a4d3e500-0001-4000-8000-000000000002",
+              "name": "tenure",
+              "value": "={{ $json.tenure }}",
+              "type": "number"
+            },
+            {
+              "id": "a4d3e500-0001-4000-8000-000000000003",
+              "name": "contract",
+              "value": "={{ $json.contract }}",
+              "type": "string"
+            },
+            {
+              "id": "a4d3e500-0001-4000-8000-000000000004",
+              "name": "monthly_charges",
+              "value": "={{ $json.monthly_charges }}",
+              "type": "number"
+            },
+            {
+              "id": "a4d3e500-0001-4000-8000-000000000005",
+              "name": "churn_probability",
+              "value": "={{ $json.churn_probability }}",
+              "type": "number"
+            },
+            {
+              "id": "a4d3e500-0001-4000-8000-000000000006",
+              "name": "risk_band",
+              "value": "={{ $json.risk_band }}",
+              "type": "string"
+            },
+            {
+              "id": "a4d3e500-0001-4000-8000-000000000007",
+              "name": "top_reasons_str",
+              "value": "={{ $json.top_reasons_str }}",
+              "type": "string"
+            },
+            {
+              "id": "a4d3e500-0001-4000-8000-000000000008",
+              "name": "action",
+              "value": "={{ $json.already_churned ? 'Already churned. No retention email.' : 'Customer is at a safe retention level. No proactive retention email required.' }}",
+              "type": "string"
+            },
+            {
+              "id": "a4d3e500-0001-4000-8000-000000000009",
+              "name": "retention_email",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c4a1e8b0-7d32-4f61-9a10-0b6e1c2d300b",
+      "name": "Safe Retention Level",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1880,
+        720
+      ],
+      "notes": "False branch of the Action Center: no Claude call and no retention email."
+    }
+  ],
+  "connections": {
+    "Run Churn Pipeline": {
+      "main": [
+        [
+          {
+            "node": "Runtime Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Runtime Config": {
+      "main": [
+        [
+          {
+            "node": "Score with XGBoost",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score with XGBoost": {
+      "main": [
+        [
+          {
+            "node": "Parse Scored Customers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Scored Customers": {
+      "main": [
+        [
+          {
+            "node": "Sort by Risk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort by Risk": {
+      "main": [
+        [
+          {
+            "node": "High Churn Risk?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Churn Risk?": {
+      "main": [
+        [
+          {
+            "node": "Build Retention Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Safe Retention Level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Retention Prompt": {
+      "main": [
+        [
+          {
+            "node": "Draft Retention Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Retention Email": {
+      "main": [
+        [
+          {
+            "node": "Format Email Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
